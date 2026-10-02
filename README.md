@@ -65,11 +65,12 @@ and video rendering), so it must be switched on with Tabeba's workspace running.
 3. When a video is ready, **Share or save** opens Android's share sheet: YouTube to post it,
    Drive or Files to keep a copy.
 
-Building the APK: push this project to a **private** GitHub repository. The workflow in
-`.github/workflows/android.yml` builds a signed APK on every push and publishes it as the
-`latest` release (download `Tabeba-workspace.apk` from the release page on the phone). The signing
-key is `android/keystore/release.p12` (password in `android/keystore.properties`); keep the same key,
-or updates won't install over the old app. To build locally instead you need Java 21 and the
+Building the APK: every push to GitHub runs `.github/workflows/android.yml`, which builds a signed
+APK and publishes it as the `latest` release (download `Tabeba-workspace.apk` from the release page
+on the phone). The signing key is **not** in the repository: it lives in `android/keystore/` +
+`android/keystore.properties` on this computer (git-ignored) and in the repository secrets
+`ANDROID_KEYSTORE_BASE64` / `ANDROID_KEYSTORE_PASSWORD`. Back up that folder: keep the same key, or
+updates won't install over the old app. To build locally instead you need Java 21 and the
 Android SDK:
 
 ```bash

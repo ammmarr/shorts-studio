@@ -5,3 +5,7 @@ tools/
 tmp/
 .env
 *.log
+
+# APK signing key: lives only on this computer and in the repository secrets
+android/keystore/
+android/keystore.properties

@@ -40,6 +40,20 @@ jobs:
 
       # The runner image ships the Android SDK (ANDROID_HOME) with licences accepted.
 
+      # The signing key is not in the repository: it comes from the encrypted repository secrets.
+      - name: Restore signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "Missing ANDROID_KEYSTORE_BASE64 / ANDROID_KEYSTORE_PASSWORD repository secrets." >&2
+            exit 1
+          fi
+          mkdir -p android/keystore
+          echo "$KEYSTORE_BASE64" | base64 -d > android/keystore/release.p12
+          printf 'storeFile=keystore/release.p12\nstorePassword=%s\nkeyAlias=tabeba\nkeyPassword=%s\n' "$KEYSTORE_PASSWORD" "$KEYSTORE_PASSWORD" > android/keystore.properties
+
       - name: Build signed release APK
         working-directory: android
         run: |
