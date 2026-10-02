@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Tabeba\'s workspace</string>
+    <string name="title_activity_main">Tabeba\'s workspace</string>
+    <string name="package_name">app.tabeba.workspace</string>
+    <string name="custom_url_scheme">app.tabeba.workspace</string>
+</resources>
