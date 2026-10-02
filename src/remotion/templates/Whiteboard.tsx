@@ -19,17 +19,21 @@ const OFFSTAGE = {x: 1180, y: 1720};
 type Point = {x: number; y: number};
 type Segment = {start: number; end: number; ink: string; at: (t: number) => Point};
 
+const GRID = 60;
+
 const Board: React.FC = () => {
 	const {theme} = useVideo();
 	const grid = theme.dark ? 'rgba(255,255,255,0.05)' : `${theme.pattern}16`;
+	// The grid is drawn as plain lines (not a repeating CSS background) so the phone's own
+	// renderer draws it exactly like the server does.
 	return (
-		<AbsoluteFill
-			style={{
-				background: theme.dark ? theme.bgTop : '#FFFFFF',
-				backgroundImage: `linear-gradient(${grid} 2px, transparent 2px), linear-gradient(90deg, ${grid} 2px, transparent 2px)`,
-				backgroundSize: '60px 60px',
-			}}
-		>
+		<AbsoluteFill style={{background: theme.dark ? theme.bgTop : '#FFFFFF'}}>
+			{Array.from({length: Math.ceil(1080 / GRID)}, (_, i) => (
+				<div key={`v${i}`} style={{position: 'absolute', top: 0, bottom: 0, left: i * GRID, width: 2, background: grid}} />
+			))}
+			{Array.from({length: Math.ceil(1920 / GRID)}, (_, i) => (
+				<div key={`h${i}`} style={{position: 'absolute', left: 0, right: 0, top: i * GRID, height: 2, background: grid}} />
+			))}
 			<AbsoluteFill
 				style={{
 					background: theme.dark

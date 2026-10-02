@@ -11,7 +11,7 @@ import {ErrorNote, ProgressBar} from '../components/ui';
 import {haptic, useWakeLock} from '../device';
 import {type TKey, useT} from '../i18n';
 import type {EditorApi} from '../pages/Editor';
-import {serverUrl} from '../server';
+import {mediaUrl} from '../media';
 
 export const PITCH_LABELS: Record<VoicePitch, TKey> = {
 	[-3]: 'pitchMuchDeeper',
@@ -47,7 +47,7 @@ const VoiceDisguise: React.FC<{editor: EditorApi}> = ({editor}) => {
 	return (
 		<>
 			{/* A new sound plays straight away so she can hear the difference. */}
-			<audio key={voice.url} controls autoPlay={changed} src={serverUrl(voice.url)} />
+			<audio key={voice.url} controls autoPlay={changed} src={mediaUrl(voice.url)} />
 			<div className="field">
 				<span>{t('voiceSound')}</span>
 				<div className="choice-chips" role="radiogroup" aria-label={t('voiceSound')}>

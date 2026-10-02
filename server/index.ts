@@ -1,10 +1,10 @@
 import {spawn} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {readFile, rm, writeFile} from 'node:fs/promises';
-import {networkInterfaces} from 'node:os';
 import path from 'node:path';
 import express, {type NextFunction, type Request, type Response} from 'express';
 import {newProject} from '../src/shared/project';
+import {duplicateOf} from '../src/shared/storeLogic';
 import {restoreFromScript} from '../src/shared/timeline';
 import {VOICE_PITCHES} from '../src/shared/themes';
 import type {Format, Health, Lang, Project, VoicePitch} from '../src/shared/types';
@@ -45,36 +45,6 @@ const json = express.json({limit: '2mb'});
 const raw = express.raw({type: () => true, limit: '120mb'});
 const param = (req: Request, name: string) => String(req.params[name]);
 
-// The phone app (Capacitor) loads its screens from http://localhost and talks to this server over Wi-Fi.
-const APP_ORIGINS = new Set(['http://localhost', 'https://localhost', 'capacitor://localhost']);
-app.use((req, res, next) => {
-	const origin = req.headers.origin;
-	if (origin && APP_ORIGINS.has(origin)) {
-		res.setHeader('Access-Control-Allow-Origin', origin);
-		res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-		res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-		res.setHeader('Access-Control-Max-Age', '86400');
-		res.setHeader('Vary', 'Origin');
-	}
-	if (req.method === 'OPTIONS') {
-		res.sendStatus(204);
-		return;
-	}
-	next();
-});
-
-// Network adapters that only exist inside this computer (virtual machines, WSL, VPNs).
-const VIRTUAL_ADAPTER = /vmware|virtualbox|vbox|vethernet|hyper-v|wsl|docker|loopback|bluetooth|tailscale|zerotier|vpn/i;
-
-/** Addresses a phone on the same Wi-Fi can use to reach this computer. */
-const lanAddresses = () => {
-	const all = Object.entries(networkInterfaces()).flatMap(([name, nets]) =>
-		(nets ?? []).filter((net) => net.family === 'IPv4' && !net.internal).map((net) => ({name, address: net.address})),
-	);
-	const real = all.filter((net) => !VIRTUAL_ADAPTER.test(net.name));
-	return (real.length > 0 ? real : all).map((net) => `http://${net.address}:${PORT}`);
-};
-
 app.get('/api/health', (_req, res) => {
 	const whisper = whisperStatus();
 	const health: Health = {
@@ -82,7 +52,6 @@ app.get('/api/health', (_req, res) => {
 		aiEnabled: aiEnabled(),
 		whisperReady: whisper.ready,
 		whisperProblem: whisper.problem,
-		addresses: lanAddresses(),
 	};
 	res.json(health);
 });
@@ -160,18 +129,7 @@ app.post('/api/projects/:id/restore', async (req, res) => {
 app.post('/api/projects/:id/duplicate', async (req, res) => {
 	const source = await getProject(param(req, 'id'));
 	const settings = await getSettings();
-	const copy: Project = {
-		...newProject(source.format, source.language, settings),
-		title: source.title ? `${source.title} (copy)` : '',
-		idea: source.idea,
-		scenes: source.scenes.map((s) => ({...s, id: crypto.randomUUID()})),
-		reviewNotes: source.reviewNotes,
-		youtube: source.youtube,
-		themeId: source.themeId,
-		templateId: source.templateId,
-		captionPosition: source.captionPosition,
-		};
-	res.json(await createProject(copy));
+	res.json(await createProject(duplicateOf(source, newProject(source.format, source.language, settings))));
 });
 
 // ---------- Icons (full Lucide set, downloaded once and cached) ----------
@@ -380,11 +338,6 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
 app.listen(PORT, () => {
 	const url = PROD ? `http://localhost:${PORT}` : 'http://localhost:5190';
 	console.log(`Tabeba's workspace is running: ${url}`);
-	if (PROD) {
-		for (const address of lanAddresses()) {
-			console.log(`On the phone app, connect to: ${address}`);
-		}
-	}
 	if (!whisperStatus().ready) {
 		console.log(`Note: ${whisperStatus().problem}`);
 	}

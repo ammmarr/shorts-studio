@@ -6,10 +6,10 @@ import {FeedbackProvider, useFeedback} from './components/feedback';
 import {useTypingClass} from './device';
 import {I18nContext, makeI18n, useT} from './i18n';
 import {Channel} from './pages/Channel';
-import {Connect} from './pages/Connect';
 import {Editor} from './pages/Editor';
 import {Home} from './pages/Home';
-import {getServer, isPhoneApp, pingServer} from './server';
+import {initLocal} from './local/backend';
+import {isLocalMode} from './platform';
 
 // ---------- Hash routing: #/  #/channel  #/v/<id>/<step> ----------
 
@@ -35,9 +35,9 @@ type AppData = {
 	/** Creates a new Short and opens it. */
 	createShort: () => Promise<void>;
 	creating: boolean;
-	/** Phone app: go back to the screen that asks for the computer's address. */
-	changeServer: () => void;
-	};
+	/** Re-reads what's available (e.g. after the AI key was added). */
+	refreshHealth: () => void;
+};
 
 const AppContext = createContext<AppData | null>(null);
 
@@ -92,8 +92,6 @@ const Shell: React.FC = () => {
 	const [health, setHealth] = useState<Health | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [creating, setCreating] = useState(false);
-	// Phone app: which computer to talk to ('lost' when the saved one stopped answering).
-	const [connect, setConnect] = useState<'new' | 'lost' | 'change' | null>(() => (isPhoneApp() && !getServer() ? 'new' : null));
 	useTypingClass();
 
 	const setSettings = useCallback(
@@ -115,10 +113,12 @@ const Shell: React.FC = () => {
 
 	const load = useCallback(async () => {
 		setError(null);
-		if (isPhoneApp()) {
-			const server = getServer();
-			if (!server || !(await pingServer(server))) {
-				setConnect(server ? 'lost' : 'new');
+		if (isLocalMode) {
+			// The phone app keeps everything on the phone: open its storage first.
+			try {
+				await initLocal();
+			} catch (e) {
+				setError((e as Error).message);
 				return;
 			}
 		}
@@ -156,6 +156,13 @@ const Shell: React.FC = () => {
 		}
 	}, [settings, creating, toast, tError]);
 
+	const refreshHealth = useCallback(() => {
+		void api
+			.health()
+			.then(setHealth)
+			.catch(() => undefined);
+	}, []);
+
 	const switchLanguage = () => {
 		const next: Lang = lang === 'ar' ? 'en' : 'ar';
 		setLang(next);
@@ -165,34 +172,15 @@ const Shell: React.FC = () => {
 			.catch(() => undefined);
 	};
 
-	if (connect) {
-		return (
-			<Connect
-				problem={connect === 'lost' ? t('connectLost') : null}
-				onConnected={() => {
-					setConnect(null);
-					setSettingsState(null);
-					void load();
-				}}
-			/>
-		);
-	}
 	if (error) {
 		return (
 			<div className="center-screen">
 				<div className="card narrow">
 					<h2>{t('cantReach', {app: t('appName')})}</h2>
 					<p className="muted">{tError(error)}</p>
-					<div className="actions stack-mobile">
-						<button className="btn primary big" onClick={() => void load()}>
-							{t('tryAgain')}
-						</button>
-						{isPhoneApp() ? (
-							<button className="btn big" onClick={() => setConnect('change')}>
-								{t('changeComputer')}
-							</button>
-						) : null}
-					</div>
+					<button className="btn primary big" onClick={() => void load()}>
+						{t('tryAgain')}
+					</button>
 				</div>
 			</div>
 		);
@@ -213,7 +201,7 @@ const Shell: React.FC = () => {
 	const showTabs = settings.setupDone && !inEditor;
 
 	return (
-		<AppContext.Provider value={{settings, health, setSettings, createShort, creating, changeServer: () => setConnect('change')}}>
+		<AppContext.Provider value={{settings, health, setSettings, createShort, creating, refreshHealth}}>
 			<div className={`app ${inEditor ? 'in-editor' : ''} ${showTabs ? 'has-tabs' : ''}`}>
 				<header className="topbar">
 					<a className="brand" href="#/">

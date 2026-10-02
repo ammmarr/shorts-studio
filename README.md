@@ -54,16 +54,24 @@ To turn on **Write my script**, copy `.env.example` to `.env` and add an Anthrop
 
 ## Phone app (Android APK)
 
-The phone app contains the app's screens; the computer above still does the heavy work (captions
-and video rendering), so it must be switched on with Tabeba's workspace running.
+The phone app works on its own: no computer, no server. Everything the computer version does
+happens on the phone:
 
-1. On the computer, open **My channel**: the "Use it on your phone" box shows the address, e.g.
-   `192.168.1.19:3100`. (The black window prints it too.) The first time, Windows asks whether
-   Node.js may use the network: allow it on **private networks**.
-2. Install the APK on the phone, open it and type that address. The phone must be on the same
-   Wi-Fi. It remembers the address; **My channel → Change** switches computers.
-3. When a video is ready, **Share or save** opens Android's share sheet: YouTube to post it,
-   Drive or Files to keep a copy.
+| | On the computer (server) | In the phone app |
+|---|---|---|
+| Storage | `data/` folder | the app's own storage (IndexedDB) |
+| Captions | whisper.cpp speech recognition | timed from her script and the pauses in her recording (`src/shared/dsp/align.ts`) |
+| Voice disguise | ffmpeg | the same effect in JavaScript (`src/shared/dsp/pitch.ts`) |
+| Making the video | Remotion in headless Chrome | Remotion's in-browser renderer (`@remotion/web-renderer`): a few minutes on a phone |
+| Write my script | key in `.env` | her own key, entered once in **My channel**, kept on the phone |
+| Icons | Lucide, cached in `data/cache/` | Lucide, downloaded once and kept |
+
+It needs the internet for the video fonts, the icon library (first time only) and the AI writer.
+Finished videos are shared with **Share or save** (Android's share sheet: YouTube to post,
+Drive or Files to keep a copy). Videos live on the phone, so uninstalling the app deletes them.
+
+Try the phone version in a browser on the computer with `?local=1` at the end of the address
+(`?local=0` switches back).
 
 Building the APK: every push to GitHub runs `.github/workflows/android.yml`, which builds a signed
 APK and publishes it as the `latest` release (download `Tabeba-workspace.apk` from the release page
@@ -77,10 +85,6 @@ Android SDK:
 npm run android:sync                      # build the screens and copy them into android/
 cd android && ./gradlew assembleRelease   # → android/app/build/outputs/apk/release/app-release.apk
 ```
-
-The same app also works on a cloud server later: install Tabeba's workspace there (with https in
-front of it) and type its address in the phone app. Add a password first; the server has no login
-because it is meant for a home network.
 
 ## Development
 
@@ -100,7 +104,7 @@ In dev mode each render re-bundles the video template, so template edits show up
 |---|---|---|
 | Video templates | `src/remotion/templates/` | Remotion (React → MP4). One file per animation style; every style renders the same scene kinds (hook, point, myth, fact, ending). Colour schemes in `src/shared/themes.ts`; positions (safe zone, caption place) in `src/shared/layout.ts`. |
 | Voice disguise | `server/voice.ts` | ffmpeg (the copy that ships with Remotion): `asetrate` + `aresample` + `atempo` moves the pitch by ±1.5 or ±3 semitones and keeps the length, so caption timing still matches. |
-| Phone app | `capacitor.config.json`, `android/`, `src/web/server.ts` | Capacitor 8. The APK serves the screens from `http://localhost`; the server allows that origin (CORS) and every API/media URL is prefixed with the saved computer address. |
+| Phone app | `capacitor.config.json`, `android/`, `src/web/local/` | Capacitor 8. `src/web/api.ts` picks the backend: the server in a browser, `src/web/local/backend.ts` in the app. The storage rules, script writer and icon search are shared (`src/shared/storeLogic.ts`, `scriptWriter.ts`, `iconLibrary.ts`), so both behave the same. |
 | Icons | `server/icons.ts` | The full Lucide set (~1,850 icons) is downloaded once from the jsDelivr CDN (`lucide-static` data files, plus categories from lucide.dev) and cached in `data/cache/`. Nothing is installed or bundled. The server searches names, tags and categories (Arabic words are mapped to English tags in `src/shared/iconKeywords.ts`) and sends the SVG drawings with each video, so renders work offline once an icon has been used. The hand-picked health icons also have built-in fallbacks. |
 | Translations | `src/web/i18n.ts` | Every screen string in English and Arabic; the app switches direction (RTL) with the language. |
 | Timing | `src/shared/timeline.ts` | Turns a project + channel settings into video props: scene start times from the voice, caption pages, script-based caption clean-up. Shared by the preview and the renderer. |

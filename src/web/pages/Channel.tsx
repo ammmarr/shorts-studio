@@ -1,4 +1,4 @@
-import {Camera, Check, Loader2, Music, Play, Smartphone, Trash2, UserRound} from 'lucide-react';
+import {Camera, Check, KeyRound, Loader2, Music, Play, Trash2, UserRound} from 'lucide-react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {VIDEO_STRINGS} from '../../shared/strings';
 import {VOICE_PITCHES} from '../../shared/themes';
@@ -9,11 +9,13 @@ import {api} from '../api';
 import {navigate, useApp} from '../App';
 import {ActionBar, Sheet, useFeedback} from '../components/feedback';
 import {PhonePreview} from '../components/PhonePreview';
-import {CaptionPositionPicker, CopyButton, ErrorNote, Segmented, TemplatePicker, ThemePicker} from '../components/ui';
+import {CaptionPositionPicker, ErrorNote, Segmented, TemplatePicker, ThemePicker} from '../components/ui';
 import {useIsMobile} from '../device';
 import {PITCH_LABELS} from '../editor/StepVoice';
 import {useT} from '../i18n';
-import {getServer, isPhoneApp, serverUrl} from '../server';
+import {getAiKey, setAiKey} from '../local/backend';
+import {mediaUrl, resolveMedia} from '../media';
+import {isLocalMode} from '../platform';
 
 /** Crops a photo to a centred square and shrinks it: the video only shows it small, in a circle. */
 const shrinkPhoto = async (file: File): Promise<File> => {
@@ -32,6 +34,69 @@ const shrinkPhoto = async (file: File): Promise<File> => {
 	}
 };
 
+/** Phone app: her own Anthropic key, so "Write my script" works without the computer. Kept only on the phone. */
+const AiKeyField: React.FC<{onChange: () => void}> = ({onChange}) => {
+	const {t} = useT();
+	const {toast} = useFeedback();
+	const [hasKey, setHasKey] = useState<boolean | null>(null);
+	const [editing, setEditing] = useState(false);
+	const [value, setValue] = useState('');
+	useEffect(() => {
+		void getAiKey().then((key) => setHasKey(Boolean(key)));
+	}, []);
+	const save = async (key: string) => {
+		await setAiKey(key);
+		setHasKey(Boolean(key.trim()));
+		setEditing(false);
+		setValue('');
+		onChange();
+		toast(key.trim() ? t('aiKeySaved') : t('aiKeyRemoved'));
+	};
+	if (hasKey === null) return null;
+	return (
+		<div className="field">
+			<span>{t('aiKeyLabel')}</span>
+			{hasKey && !editing ? (
+				<div className="upload-row">
+					<span className="chip ok">
+						<KeyRound size={14} /> {t('aiKeyIsSet')}
+					</span>
+					<button type="button" className="btn small" onClick={() => setEditing(true)}>
+						{t('change')}
+					</button>
+					<button type="button" className="btn ghost small danger" onClick={() => void save('')}>
+						<Trash2 size={15} /> {t('remove')}
+					</button>
+				</div>
+			) : (
+				<form
+					className="upload-row"
+					onSubmit={(e) => {
+						e.preventDefault();
+						if (value.trim()) void save(value);
+					}}
+				>
+					<input
+						type="password"
+						dir="ltr"
+						autoComplete="off"
+						autoCapitalize="none"
+						spellCheck={false}
+						placeholder="sk-ant-…"
+						value={value}
+						onChange={(e) => setValue(e.target.value)}
+						style={{flex: 1, minWidth: 0}}
+					/>
+					<button type="submit" className="btn" disabled={!value.trim()}>
+						{t('saveKey')}
+					</button>
+				</form>
+			)}
+			<small className="muted">{t('aiKeyHint')}</small>
+		</div>
+	);
+};
+
 const normalizeHandle = (handle: string) => {
 	const h = handle.trim().replace(/\s+/g, '');
 	return h && !h.startsWith('@') ? `@${h}` : h;
@@ -39,7 +104,7 @@ const normalizeHandle = (handle: string) => {
 
 /** Channel look: saved automatically, used by every new video. Also the first-run welcome screen. */
 export const Channel: React.FC = () => {
-	const {settings, setSettings, health, changeServer} = useApp();
+	const {settings, setSettings, refreshHealth} = useApp();
 	const {t, tError} = useT();
 	const {toast} = useFeedback();
 	const isMobile = useIsMobile();
@@ -110,7 +175,7 @@ export const Channel: React.FC = () => {
 	// The preview shows her name, photo, colours and animation style.
 	const preview = useMemo(() => {
 		const project = {...sampleProject(draft.language, draft.themeId), templateId: draft.templateId, captionPosition: draft.captionPosition};
-		return buildVideoProps(project, draft, {mediaBase: getServer() || undefined});
+		return buildVideoProps(project, draft, {resolve: resolveMedia});
 	}, [draft]);
 	const previewKey = `${draft.language}-${draft.themeId}-${draft.templateId}-${draft.captionPosition}`;
 	const photoInput = (
@@ -143,7 +208,7 @@ export const Channel: React.FC = () => {
 				<section className="card form">
 					<div className="avatar-upload">
 						<label className={`avatar-drop ${draft.logoUrl ? 'has-photo' : ''}`} aria-label={draft.logoUrl ? t('changePhoto') : t('uploadPhoto')}>
-							{draft.logoUrl ? <img src={serverUrl(draft.logoUrl)} alt="" /> : <UserRound size={44} strokeWidth={1.5} />}
+							{draft.logoUrl ? <img src={mediaUrl(draft.logoUrl)} alt="" /> : <UserRound size={44} strokeWidth={1.5} />}
 							<span className="avatar-badge">{uploading ? <Loader2 size={16} className="spin" /> : <Camera size={16} />}</span>
 							{photoInput}
 						</label>
@@ -272,7 +337,7 @@ export const Channel: React.FC = () => {
 					<div className="field">
 						<span>{t('musicLabel')}</span>
 						<div className="upload-row">
-							{draft.musicUrl ? <audio controls src={serverUrl(draft.musicUrl)} /> : <span className="muted small">{t('noMusic')}</span>}
+							{draft.musicUrl ? <audio controls src={mediaUrl(draft.musicUrl)} /> : <span className="muted small">{t('noMusic')}</span>}
 							<label className="btn">
 								<Music size={18} /> {draft.musicUrl ? t('change') : t('uploadMp3')}
 								<input hidden type="file" accept="audio/mpeg,audio/wav,audio/ogg" onChange={(e) => upload('music', e.target.files?.[0])} />
@@ -287,32 +352,12 @@ export const Channel: React.FC = () => {
 					</div>
 				</section>
 
-				{isPhoneApp() ? (
-					<section className="card phone-link">
-						<Smartphone size={22} className="accent" />
-						<div>
-							<strong>{t('connectedTo')}</strong>
-							<p className="muted small mono" dir="ltr">
-								{getServer().replace(/^https?:\/\//, '')}
-							</p>
-						</div>
-						<button className="btn small" onClick={changeServer}>
-							{t('change')}
-						</button>
-					</section>
-				) : health.addresses.length > 0 ? (
-					<section className="card phone-link">
-						<Smartphone size={22} className="accent" />
-						<div>
-							<strong>{t('usePhoneTitle')}</strong>
-							<p className="muted small">{t('usePhoneBody')}</p>
-							{health.addresses.map((address) => (
-								<p key={address} className="phone-address mono" dir="ltr">
-									{address.replace(/^http:\/\//, '')}
-									<CopyButton text={address.replace(/^http:\/\//, '')} onCopied={() => toast(t('copied'))} />
-								</p>
-							))}
-						</div>
+				{isLocalMode ? (
+					<section className="card form">
+						<AiKeyField onChange={refreshHealth} />
+						<p className="muted small" style={{margin: 0}}>
+							{t('storedOnPhone')}
+						</p>
 					</section>
 				) : null}
 

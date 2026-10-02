@@ -134,14 +134,18 @@ export const PrescriptionTemplate: React.FC<{props: VideoProps}> = ({props}) => 
 						padding: '26px 40px 30px',
 						// Photos get their own column on the pad, so they never cover the writing.
 						paddingInlineEnd: hasPhotos && !cta ? 300 : 40,
-						backgroundImage: `linear-gradient(transparent 94%, ${theme.cardBorder} 94%)`,
-						backgroundSize: '100% 64px',
+						position: 'relative',
+						overflow: 'hidden',
 						display: 'flex',
 						flexDirection: 'column',
-					}}
-				>
-					{hook ? (
-						<div style={{flexShrink: 0, fontSize: 58, fontWeight: 900, lineHeight: 1.2, color: theme.text, marginBottom: 18, clipPath: reveal(titleWrite)}}>
+						}}
+						>
+						{/* Ruled lines as plain lines (not a repeating background), so the phone draws them too. */}
+						{Array.from({length: 24}, (_, i) => (
+						<div key={i} style={{position: 'absolute', left: 0, right: 0, top: 60 + i * 64, height: 4, background: theme.cardBorder}} />
+						))}
+						{hook ? (
+						<div style={{position: 'relative', flexShrink: 0, fontSize: 58, fontWeight: 900, lineHeight: 1.2, color: theme.text, marginBottom: 18, clipPath: reveal(titleWrite)}}>
 							{stripMarkup(hook.headline)}
 							<div style={{height: 6, width: '40%', borderRadius: 3, background: theme.accent, marginTop: 10}} />
 						</div>
@@ -149,24 +153,26 @@ export const PrescriptionTemplate: React.FC<{props: VideoProps}> = ({props}) => 
 					{/* Rows sit under the title; once the pad is full the oldest slide off the top, so the newest is always visible. */}
 					<div
 						style={{
+							position: 'relative',
 							flex: 1,
 							minHeight: 0,
 							overflow: 'hidden',
 							display: 'flex',
 							flexDirection: 'column',
 							justifyContent: 'flex-end',
-							maskImage: 'linear-gradient(to bottom, transparent 0, #000 30px)',
 						}}
-					>
+						>
 						{visibleRows.map((row) => (
 							<div key={row.start} style={{flexShrink: 0}}>
 								<PadRow row={row} frame={frame} current={row.scene === current} />
 							</div>
 						))}
 						<div style={{flexGrow: 1}} />
-					</div>
+						{/* rows sliding off the top fade out under the title */}
+						<div style={{position: 'absolute', top: 0, left: 0, right: 0, height: 30, background: 'linear-gradient(#FFFFFF, rgba(255,255,255,0))'}} />
+						</div>
 					{cta ? (
-						<div style={{flexShrink: 0, marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20}}>
+						<div style={{position: 'relative', flexShrink: 0, marginTop: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20}}>
 							<div style={{display: 'flex', alignItems: 'center', gap: 14, padding: '18px 40px', borderRadius: 999, background: '#FF0033', color: '#FFFFFF', fontSize: 44, fontWeight: 800}}>
 								<BellRing size={42} color="#FFFFFF" strokeWidth={2.4} />
 								{strings.subscribe}

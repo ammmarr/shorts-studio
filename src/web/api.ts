@@ -10,13 +10,14 @@ import type {
 	Settings,
 	VoicePitch,
 	Word,
-	} from '../shared/types';
-	import {serverUrl} from './server';
+} from '../shared/types';
+import {localApi} from './local/backend';
+import {isLocalMode} from './platform';
 
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 	let res: Response;
 	try {
-		res = await fetch(serverUrl(path), init);
+		res = await fetch(path, init);
 	} catch {
 		throw new Error("Tabeba's workspace is not responding. Check your internet connection, or that the computer running it is switched on.");
 	}
@@ -39,7 +40,8 @@ const sendFile = (file: Blob, type = file.type): RequestInit => ({
 	body: file,
 });
 
-export const api = {
+/** The app's own server on the computer. */
+const serverApi = {
 	health: () => request<Health>('/api/health'),
 	settings: () => request<Settings>('/api/settings'),
 	saveSettings: (settings: Partial<Settings>) => request<Settings>('/api/settings', sendJson('PUT', settings)),
@@ -66,8 +68,9 @@ export const api = {
 	removeVoice: (id: string) => request<Project>(`/api/projects/${id}/voice`, {method: 'DELETE'}),
 	transcribe: (id: string) => request<{jobId: string}>(`/api/projects/${id}/transcribe`, {method: 'POST'}),
 	render: (id: string) => request<{jobId: string}>(`/api/projects/${id}/render`, {method: 'POST'}),
+	job: <T>(id: string) => request<JobStatus<T>>(`/api/jobs/${id}`),
 	reveal: (fileName: string) => request<{ok: true}>(`/api/reveal/${encodeURIComponent(fileName)}`, {method: 'POST'}),
-	downloadUrl: (fileName: string) => serverUrl(`/api/download/${encodeURIComponent(fileName)}`),
+	downloadUrl: (fileName: string) => `/api/download/${encodeURIComponent(fileName)}`,
 
 	icons: (query: string, category: string) =>
 		request<{total: number; icons: {name: string; body: string}[]; librarySize: number}>(
@@ -76,12 +79,17 @@ export const api = {
 	iconBodies: (names: string[]) => request<Record<string, string>>(`/api/icons/bodies?names=${names.map(encodeURIComponent).join(',')}`),
 };
 
+export type Backend = typeof serverApi;
+
+/** The phone app does everything on the phone; in a browser on the computer, the server does. */
+export const api: Backend = isLocalMode ? localApi : serverApi;
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-/** Polls a background job until it finishes. */
+/** Follows a background job until it finishes. */
 export const waitForJob = async <T>(jobId: string, onProgress: (p: number) => void): Promise<T> => {
 	for (;;) {
-		const job = await request<JobStatus<T>>(`/api/jobs/${jobId}`);
+		const job = await api.job<T>(jobId);
 		onProgress(job.progress);
 		if (job.status === 'done') {
 			return job.result as T;
@@ -89,7 +97,7 @@ export const waitForJob = async <T>(jobId: string, onProgress: (p: number) => vo
 		if (job.status === 'error') {
 			throw new Error(job.error ?? 'The task failed.');
 		}
-		await sleep(1000);
+		await sleep(isLocalMode ? 500 : 1000);
 	}
 };
 

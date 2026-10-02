@@ -2,12 +2,5 @@
   "appId": "app.tabeba.workspace",
   "appName": "Tabeba's workspace",
   "webDir": "dist/web",
-  "backgroundColor": "#fafafa",
-  "server": {
-    "androidScheme": "http",
-    "cleartext": true
-  },
-  "android": {
-    "allowMixedContent": true
-  }
+  "backgroundColor": "#fafafa"
 }

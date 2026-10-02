@@ -1,5 +1,6 @@
 import React, {useMemo} from 'react';
-import {AbsoluteFill, Html5Audio, interpolate} from 'remotion';
+import {Audio} from '@remotion/media';
+import {AbsoluteFill, interpolate} from 'remotion';
 import {layoutFor} from '../shared/layout';
 import {THEMES} from '../shared/themes';
 import {durationInFrames} from '../shared/timeline';
@@ -41,9 +42,10 @@ export const ShortVideo: React.FC<VideoProps> = (props) => {
 		<VideoContext.Provider value={context}>
 			<AbsoluteFill style={{fontFamily: fontFor(props.language), direction: rtl ? 'rtl' : 'ltr', color: theme.text}}>
 				<Template props={props} />
-				{props.audioUrl ? <Html5Audio src={props.audioUrl} /> : null}
+				{/* @remotion/media's Audio works in both renderers: the server's and the phone's own. */}
+				{props.audioUrl ? <Audio src={props.audioUrl} /> : null}
 				{props.musicUrl ? (
-					<Html5Audio
+					<Audio
 						src={props.musicUrl}
 						loop
 						volume={(f) =>

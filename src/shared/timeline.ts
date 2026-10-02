@@ -287,10 +287,14 @@ export const msToFrame = (ms: number) => Math.round((ms / 1000) * FPS);
 export const buildVideoProps = (
 	project: Project,
 	settings: Settings,
-	options: {mediaBase?: string; icons?: Record<string, string>} = {},
-): VideoProps => {
-	const absolute = (url: string | null | undefined) =>
-		url && options.mediaBase && url.startsWith('/') ? options.mediaBase + url : (url ?? null);
+	options: {mediaBase?: string; icons?: Record<string, string>; resolve?: (path: string) => string | null} = {},
+	): VideoProps => {
+	// Media paths become full URLs: on the server's address, or (on the phone) the stored file's URL.
+	const absolute = (url: string | null | undefined) => {
+		if (!url || !url.startsWith('/')) return url ?? null;
+		if (options.resolve) return options.resolve(url);
+		return options.mediaBase ? options.mediaBase + url : url;
+	};
 	const lang = project.language;
 	const {scenes, voice} = project;
 

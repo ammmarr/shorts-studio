@@ -38,7 +38,7 @@ export const trimSilence = (data: Float32Array, rate = RATE): Float32Array => {
 	return data.slice(start, end);
 };
 
-const encodeWav = (data: Float32Array, rate: number) => {
+export const encodeWav = (data: Float32Array, rate: number) => {
 	const buffer = new ArrayBuffer(44 + data.length * 2);
 	const view = new DataView(buffer);
 	const text = (offset: number, value: string) => {
@@ -87,4 +87,38 @@ export const toCleanWav = async (recording: Blob): Promise<{wav: Blob; durationM
 	normalize(mono);
 	const trimmed = trimSilence(mono);
 	return {wav: encodeWav(trimmed, RATE), durationMs: Math.round((trimmed.length / RATE) * 1000)};
+};
+
+/** Reads a 16-bit PCM WAV (as made by toCleanWav) back into mono samples. */
+export const decodeWav = async (wav: Blob): Promise<{samples: Float32Array; sampleRate: number}> => {
+	const view = new DataView(await wav.arrayBuffer());
+	const tag = (offset: number) => String.fromCharCode(...[0, 1, 2, 3].map((i) => view.getUint8(offset + i)));
+	if (view.byteLength < 12 || tag(0) !== 'RIFF' || tag(8) !== 'WAVE') {
+		throw new Error('The recording is not a valid WAV file.');
+	}
+	let channels = 1;
+	let sampleRate = RATE;
+	let bits = 16;
+	let offset = 12;
+	while (offset + 8 <= view.byteLength) {
+		const size = view.getUint32(offset + 4, true);
+		const body = offset + 8;
+		if (tag(offset) === 'fmt ') {
+			channels = view.getUint16(body + 2, true);
+			sampleRate = view.getUint32(body + 4, true);
+			bits = view.getUint16(body + 14, true);
+		} else if (tag(offset) === 'data') {
+			if (bits !== 16) throw new Error('Only 16-bit PCM WAV recordings are supported.');
+			const frames = Math.floor(Math.min(size, view.byteLength - body) / (2 * channels));
+			const samples = new Float32Array(frames);
+			for (let i = 0; i < frames; i++) {
+				let sum = 0;
+				for (let c = 0; c < channels; c++) sum += view.getInt16(body + (i * channels + c) * 2, true);
+				samples[i] = sum / channels / 32768;
+			}
+			return {samples, sampleRate};
+		}
+		offset = body + size + (size % 2);
+	}
+	throw new Error('The recording has no audio data.');
 };

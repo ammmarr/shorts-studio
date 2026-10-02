@@ -1,6 +1,6 @@
 import {KeepAwake} from '@capacitor-community/keep-awake';
 import {useEffect, useState} from 'react';
-import {isPhoneApp} from './server';
+import {isPhoneApp} from './platform';
 
 /** Short vibration for tactile feedback on Android; silently ignored elsewhere. */
 export const haptic = (pattern: number | number[] = 12) => {

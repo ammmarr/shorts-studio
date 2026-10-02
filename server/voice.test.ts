@@ -1,5 +1,5 @@
 import {describe, expect, it} from 'vitest';
-import {isMediaImage} from './store';
+import {isMediaImage} from '../src/shared/storeLogic';
 import {pitchFilter} from './voice';
 
 describe('pitchFilter', () => {

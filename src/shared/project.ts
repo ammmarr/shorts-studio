@@ -70,3 +70,16 @@ export const newProject = (format: Format, language: Lang, settings: Settings): 
 };
 
 export const FORMATS: Format[] = ['tips', 'myth_fact', 'qa'];
+
+const fileSafe = (text: string) =>
+	text
+		.replace(/[^\p{L}\p{N}]+/gu, '-')
+		.replace(/^-+|-+$/g, '')
+		.slice(0, 50) || 'short';
+
+/** "Drinking-water-2026-10-02-1459.mp4": the video's name plus when it was made. */
+export const renderFileName = (project: Project, extension: string, now = new Date()) => {
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+	return `${fileSafe(project.title || project.youtube.title)}-${stamp}.${extension}`;
+};

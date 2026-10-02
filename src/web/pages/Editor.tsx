@@ -1,6 +1,6 @@
 import {ArrowLeft, Check, CloudOff, Film, Lightbulb, Loader2, Mic, PenLine, Play} from 'lucide-react';
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {buildVideoProps} from '../../shared/timeline';
+import {buildVideoProps, propsSignature} from '../../shared/timeline';
 import type {Project, RenderInfo, VoicePitch} from '../../shared/types';
 import {api, waitForJob, type TranscribeResult} from '../api';
 import {navigate, useApp} from '../App';
@@ -14,7 +14,7 @@ import {StepVoice} from '../editor/StepVoice';
 import {haptic, useIsMobile, useWakeLock} from '../device';
 import {useT} from '../i18n';
 import {useIconBodies} from '../icons';
-import {getServer} from '../server';
+import {resolveMedia} from '../media';
 
 const STEPS = [
 	{id: 'idea', label: 'step_idea', Icon: Lightbulb},
@@ -183,7 +183,9 @@ export const Editor: React.FC<{id: string; step: string}> = ({id, step}) => {
 
 	// Drawings for the scene icons, so the preview can show any icon from the library.
 	const icons = useIconBodies(project?.scenes.map((s) => s.icon) ?? []);
-	const videoProps = useMemo(() => (project ? buildVideoProps(project, settings, {icons, mediaBase: getServer() || undefined}) : null), [project, settings, icons]);
+	const videoProps = useMemo(() => (project ? buildVideoProps(project, settings, {icons, resolve: resolveMedia}) : null), [project, settings, icons]);
+	// The same fingerprint the finished video was stamped with (from the stored paths, not this device's URLs).
+	const signature = useMemo(() => (project ? propsSignature(buildVideoProps(project, settings)) : ''), [project, settings]);
 	const previewHint = project?.voice ? t('previewWithVoice') : t('previewNoVoice');
 
 	if (loadError) {
@@ -267,7 +269,7 @@ export const Editor: React.FC<{id: string; step: string}> = ({id, step}) => {
 					{current === 'idea' ? <StepIdea editor={editor} /> : null}
 					{current === 'script' ? <StepScript editor={editor} /> : null}
 					{current === 'voice' ? <StepVoice editor={editor} /> : null}
-					{current === 'video' ? <StepVideo editor={editor} videoProps={videoProps} /> : null}
+					{current === 'video' ? <StepVideo editor={editor} videoProps={videoProps} signature={signature} /> : null}
 				</div>
 				{isMobile ? null : (
 					<aside className="preview-col">

@@ -1,6 +1,5 @@
 import {Clapperboard, Download, FolderOpen, Loader2, PartyPopper, Share2, TriangleAlert} from 'lucide-react';
 import React, {useState} from 'react';
-import {propsSignature} from '../../shared/timeline';
 import type {VideoProps} from '../../shared/types';
 import {api} from '../api';
 import {ActionBar, useFeedback} from '../components/feedback';
@@ -8,11 +7,12 @@ import {CaptionPositionPicker, CopyButton, ErrorNote, ProgressBar, TemplatePicke
 import {useIsMobile} from '../device';
 import {useT} from '../i18n';
 import type {EditorApi} from '../pages/Editor';
-import {isPhoneApp, serverUrl} from '../server';
+import {mediaUrl} from '../media';
+import {isLocalMode, isPhoneApp} from '../platform';
 import {canShareVideos, shareVideo} from '../share';
 
-
-export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = ({editor, videoProps}) => {
+/** `signature` fingerprints the video as it is now; a render made from anything else is out of date. */
+export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps; signature: string}> = ({editor, signature}) => {
 	const {project, update, renderJob} = editor;
 	const {toast} = useFeedback();
 	const {t} = useT();
@@ -20,7 +20,7 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 	const [error, setError] = useState<string | null>(null);
 	const [sharing, setSharing] = useState(false);
 	const render = project.render;
-	const outdated = render ? render.signature !== propsSignature(videoProps) : false;
+	const outdated = render ? render.signature !== signature : false;
 	const hashtags = project.youtube.hashtags.map((h) => `#${h}`).join(' ');
 	const description = [project.youtube.description, hashtags].filter(Boolean).join('\n\n');
 	const shareable = canShareVideos();
@@ -30,10 +30,10 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 		if (!render) return;
 		setSharing(true);
 		try {
-			await shareVideo(serverUrl(render.url), render.fileName, project.youtube.title || project.title);
-			} catch {
+			await shareVideo(render, project.youtube.title || project.title);
+		} catch {
 			toast(t('shareFailed'), {tone: 'error'});
-			} finally {
+		} finally {
 			setSharing(false);
 		}
 	};
@@ -69,7 +69,7 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 					<span>{t('colours')}</span>
 					<ThemePicker value={project.themeId} onChange={(themeId) => update((p) => ({...p, themeId}))} />
 				</div>
-				</section>
+			</section>
 
 			<ErrorNote message={error ?? renderJob.error} />
 
@@ -78,7 +78,7 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 					<div role="status">
 						<ProgressBar value={renderJob.progress} label={t('creatingVideo')} />
 						<p className="muted small" style={{marginTop: 10}}>
-							{t('creatingHint')}
+							{isLocalMode ? t('creatingHintPhone') : t('creatingHint')}
 						</p>
 					</div>
 				) : render ? (
@@ -94,7 +94,7 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 						</div>
 						{outdated ? <div className="note">{t('outdated')}</div> : null}
 						{phoneApp && !outdated ? <p className="muted small">{t('shareHint')}</p> : null}
-						<video className="final-video" src={serverUrl(render.url)} controls playsInline preload="metadata" />
+						<video className="final-video" src={mediaUrl(render.url)} controls playsInline preload="metadata" />
 					</>
 				) : (
 					<p className="muted" style={{margin: 0}}>
@@ -163,13 +163,13 @@ export const StepVideo: React.FC<{editor: EditorApi; videoProps: VideoProps}> = 
 							<button className="btn primary big" onClick={share} disabled={sharing}>
 								{sharing ? <Loader2 size={18} className="spin" /> : <Share2 size={18} />} {phoneApp ? t('shareOrSave') : t('share')}
 							</button>
-							) : null}
-							{phoneApp ? null : (
-							<a className={`btn big ${shareable ? '' : 'primary'}`} href={api.downloadUrl(render.fileName)} download>
+						) : null}
+						{phoneApp ? null : (
+							<a className={`btn big ${shareable ? '' : 'primary'}`} href={api.downloadUrl(render.fileName)} download={render.fileName}>
 								<Download size={18} /> {t('download')}
 							</a>
-							)}
-							{isMobile || phoneApp ? null : (
+						)}
+						{isMobile || isLocalMode ? null : (
 							<button className="btn big" onClick={() => api.reveal(render.fileName).catch((e: Error) => setError(e.message))}>
 								<FolderOpen size={18} /> {t('showInFolder')}
 							</button>

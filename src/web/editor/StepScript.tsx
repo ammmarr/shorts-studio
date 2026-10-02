@@ -9,7 +9,7 @@ import {IconPicker} from '../components/IconPicker';
 import {useT} from '../i18n';
 import {shrinkImage} from '../images';
 import type {EditorApi} from '../pages/Editor';
-import {serverUrl} from '../server';
+import {mediaUrl} from '../media';
 
 const KIND_OPTIONS: SceneKind[] = ['hook', 'point', 'myth', 'fact', 'cta'];
 
@@ -58,7 +58,7 @@ const ScenePicture: React.FC<{scene: Scene; onChange: (patch: Partial<Scene>) =>
 		<div className="scene-picture">
 			{scene.image ? (
 				<div className="photo-tile">
-					<img src={serverUrl(scene.image)} alt="" />
+					<img src={mediaUrl(scene.image)} alt="" />
 					<button type="button" className="photo-remove" onClick={() => onChange({image: null})} aria-label={t('removePhoto')}>
 						<X size={14} />
 					</button>

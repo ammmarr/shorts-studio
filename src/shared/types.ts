@@ -109,8 +109,6 @@ export type Health = {
 	aiEnabled: boolean;
 	whisperReady: boolean;
 	whisperProblem: string | null;
-	/** Addresses the phone app can use to reach this computer over Wi-Fi. */
-	addresses: string[];
 };
 
 export type JobStatus<T = unknown> = {

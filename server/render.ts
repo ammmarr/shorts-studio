@@ -1,6 +1,7 @@
 import {bundle} from '@remotion/bundler';
 import {renderMedia, selectComposition} from '@remotion/renderer';
 import path from 'node:path';
+import {renderFileName} from '../src/shared/project';
 import {buildVideoProps, propsSignature} from '../src/shared/timeline';
 import type {Project, RenderInfo, Settings} from '../src/shared/types';
 import {iconBodies} from './icons';
@@ -19,12 +20,6 @@ const getServeUrl = () => {
 	return bundled;
 };
 
-const fileSafe = (text: string) =>
-	text
-		.replace(/[^\p{L}\p{N}]+/gu, '-')
-		.replace(/^-+|-+$/g, '')
-		.slice(0, 50) || 'short';
-
 export const renderProject = async (
 	project: Project,
 	settings: Settings,
@@ -37,14 +32,13 @@ export const renderProject = async (
 	onProgress(0.02);
 	const serveUrl = await getServeUrl();
 	onProgress(0.08);
-	const composition = await selectComposition({serveUrl, id: 'Short', inputProps});
-	const now = new Date();
-	const pad = (n: number) => String(n).padStart(2, '0');
-	const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
-	const fileName = `${fileSafe(project.title || project.youtube.title)}-${stamp}.mp4`;
+	const composition = await selectComposition({serveUrl, id: 'Short', inputProps, chromiumOptions: {disableWebSecurity: true}});
+	const fileName = renderFileName(project, 'mp4');
 	await renderMedia({
 		composition,
 		serveUrl,
+		// The voice and music are fetched from this server, a different port than the bundle.
+		chromiumOptions: {disableWebSecurity: true},
 		codec: 'h264',
 		crf: 20,
 		outputLocation: path.join(RENDERS_DIR, fileName),
